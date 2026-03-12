@@ -26,5 +26,19 @@
 
 // --- Sistem Sabitleri ---
 #define BAUD_RATE       115200
-#define MOTOR_PWM_FREQ  1000    // Hz (ileride TIMER ayarı için)
-#define DEBOUNCE_MS     50      // Buton debounce süresi (ms)
+
+
+// ─── Encoder ──────────────────────────────────────────
+#define STALL_TIMEOUT_MS    300
+
+// ─── Motor PWM ────────────────────────────────────────
+#define MOTOR_PWM_INIT      50   // Init sirasinda dusuk guc
+#define MOTOR_PWM_NORMAL    180  // Normal kullanim
+
+// ─── Perde Modlari ────────────────────────────────────
+#define MODE_NORMAL     0  // 0% kapali, 100% acik
+#define MODE_VERTICAL   1  // 0% kapali, 50% acik, 100% kapali
+#define MODE_SPLIT      2  // 0% kapali, 100% iki yana acik
+
+// ▼▼▼ BURADAN SEÇ ▼▼▼
+#define CURTAIN_MODE    MODE_VERTICAL

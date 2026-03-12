@@ -10,12 +10,13 @@
             "includePath": [
                 "c:/Users/Meth/Desktop/TEKLOJIK/Curtain Module/CurtainModule/include",
                 "c:/Users/Meth/Desktop/TEKLOJIK/Curtain Module/CurtainModule/src",
-                "C:/Users/Meth/.platformio/packages/framework-arduino-avr/cores/arduino",
-                "C:/Users/Meth/.platformio/packages/framework-arduino-avr/variants/standard",
                 "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
-                "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                "c:/Users/Meth/Desktop/TEKLOJIK/Curtain Module/CurtainModule/.pio/libdeps/uno/FastLED/src",
                 "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
                 "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                "C:/Users/Meth/.platformio/packages/framework-arduino-avr/cores/arduino",
+                "C:/Users/Meth/.platformio/packages/framework-arduino-avr/variants/standard",
+                "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/HID/src",
                 "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                 ""
             ],
@@ -24,12 +25,13 @@
                 "path": [
                     "c:/Users/Meth/Desktop/TEKLOJIK/Curtain Module/CurtainModule/include",
                     "c:/Users/Meth/Desktop/TEKLOJIK/Curtain Module/CurtainModule/src",
-                    "C:/Users/Meth/.platformio/packages/framework-arduino-avr/cores/arduino",
-                    "C:/Users/Meth/.platformio/packages/framework-arduino-avr/variants/standard",
                     "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
-                    "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                    "c:/Users/Meth/Desktop/TEKLOJIK/Curtain Module/CurtainModule/.pio/libdeps/uno/FastLED/src",
                     "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
                     "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                    "C:/Users/Meth/.platformio/packages/framework-arduino-avr/cores/arduino",
+                    "C:/Users/Meth/.platformio/packages/framework-arduino-avr/variants/standard",
+                    "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/HID/src",
                     "C:/Users/Meth/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                     ""
                 ]

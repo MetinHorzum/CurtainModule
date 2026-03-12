@@ -1,41 +1,45 @@
 #include <Arduino.h>
 #include "config.h"
 #include "Motor.h"
+#include "Encoder.h"
+#include "LED.h"
+#include "Button.h"
+#include "Settings.h"
+#include "CurtainController.h"
 
-// Motor nesnesi config.h pinleri
-Motor motor(PIN_AIN1, PIN_AIN2, PIN_NSLEEP, PIN_NFAULT);
+Motor             motor(PIN_AIN1, PIN_AIN2, PIN_NSLEEP, PIN_NFAULT);
+Encoder           encoder(PIN_ENCODER);
+LED               led;
+Button            button(PIN_BUTTON);
+CurtainController curtain(motor, encoder, led, button);
+
+void encoderISR() {
+    encoder.update();
+}
 
 void setup() {
-  Serial.begin(BAUD_RATE);
-  Serial.println(F("CurtainModule v0.1 - Basliyor..."));
+    Serial.begin(BAUD_RATE);
+    Serial.println("CurtainModule v0.5");
 
-  motor.begin();
-  Serial.println(F("Motor hazir."));
+    motor.begin();
+    encoder.begin();
+    led.begin();
+    button.begin();
+
+    attachInterrupt(digitalPinToInterrupt(PIN_ENCODER),
+                    encoderISR, FALLING);
+
+    curtain.begin();
 }
 
 void loop() {
-    // Test: İleri 2 sn → Dur 1 sn → Geri 2 sn → Dur 1 sn
-    
-    Serial.println(F("İleri..."));
-    motor.forward(200);   // %78 hız
-    delay(2000);
+    curtain.update();
 
-    Serial.println(F("Fren!"));
-    motor.brake();
-    delay(1000);
-
-    Serial.println(F("Geri..."));
-    motor.backward(200);
-    delay(2000);
-
-    Serial.println(F("Fren!"));
-    motor.brake();
-    delay(1000);
-
-    // Hata kontrolü
-    if (motor.isFault()) {
-        Serial.println(F("⚠️ MOTOR HATA!"));
-        motor.sleep();
-        while(true);   // Dur, reset bekle
+    // Debug: Her 2 sn pozisyon yaz
+    static uint32_t lastPrint = 0;
+    if (millis() - lastPrint >= 2000) {
+        Serial.print("Poz: %");
+        Serial.println(curtain.getPosition());
+        lastPrint = millis();
     }
 }
