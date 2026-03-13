@@ -20,21 +20,11 @@ void encoderISR() {
 // ─────────────────────────────────────────
 void runCalibration() {
     Serial.println("─────────────────────────────");
-    Serial.println("KALIBRASYON MODU BASLADI");
+    Serial.println("KALIBRASYON BASLADI");
     Serial.println("─────────────────────────────");
-    led.setInit();
 
-    // ADIM 1: Buton bekle
-    Serial.println("[1] Butona bas -> Baslat");
-    while (!button.isShortPress()) {
-        button.update();
-        led.update();
-    }
-    Serial.println("[1] OK - Buton algilandi");
-    delay(200);
-
-    // ADIM 2: Kapan → Stall = Kapali nokta
-    Serial.println("[2] Motor kapaniyor (PWM=50)...");
+    // ADIM 1: Kapan
+    Serial.println("[1] Motor kapaniyor (PWM=50)...");
     led.setClosing();
     encoder.resetCount();
     motor.forward(50);
@@ -53,7 +43,7 @@ void runCalibration() {
 
         if (motor.isFault()) {
             motor.brake();
-            Serial.println("[!] MOTOR HATA - NFAULT tetiklendi!");
+            Serial.println("[!] MOTOR HATA!");
             led.setError();
             while(true) { led.update(); }
         }
@@ -61,8 +51,8 @@ void runCalibration() {
         if (encoder.isStalled(STALL_TIMEOUT_MS)) {
             motor.brake();
             settings.closingTime_ms = millis() - startTime;
-            Serial.println("[2] OK - Stall tespit edildi (Tam kapali)");
-            Serial.print("    Kapanma suresi: "); Serial.print(settings.closingTime_ms); Serial.println("ms");
+            Serial.println("[1] OK - Tam kapali");
+            Serial.print("    Sure: "); Serial.print(settings.closingTime_ms); Serial.println("ms");
             break;
         }
     }
@@ -70,8 +60,8 @@ void runCalibration() {
     delay(500);
     encoder.resetCount();
 
-    // ADIM 3: Ac → Stall = Acik nokta
-    Serial.println("[3] Motor aciliyor (PWM=50)...");
+    // ADIM 2: Ac
+    Serial.println("[2] Motor aciliyor (PWM=50)...");
     led.setOpening();
     motor.backward(50);
 
@@ -89,7 +79,7 @@ void runCalibration() {
 
         if (motor.isFault()) {
             motor.brake();
-            Serial.println("[!] MOTOR HATA - NFAULT tetiklendi!");
+            Serial.println("[!] MOTOR HATA!");
             led.setError();
             while(true) { led.update(); }
         }
@@ -97,26 +87,26 @@ void runCalibration() {
         if (encoder.isStalled(STALL_TIMEOUT_MS)) {
             motor.brake();
             settings.openingTime_ms = millis() - startTime;
-            Serial.println("[3] OK - Stall tespit edildi (Tam acik)");
-            Serial.print("    Acilma suresi: "); Serial.print(settings.openingTime_ms); Serial.println("ms");
-            Serial.print("    Toplam pulse:  "); Serial.println(encoder.getCount());
+            Serial.println("[2] OK - Tam acik");
+            Serial.print("    Sure: ");        Serial.print(settings.openingTime_ms); Serial.println("ms");
+            Serial.print("    Toplam pulse: "); Serial.println(encoder.getCount());
             break;
         }
     }
 
-    // ADIM 4: Kaydet
+    // ADIM 3: Kaydet
     settings.totalPulses     = encoder.getCount();
-    settings.currentPosition = 100;   // Simdi tam acik
+    settings.currentPosition = 100;
     settings.isInitialized   = true;
     Settings::save(settings);
 
-    // ADIM 5: Dogrula
+    // ADIM 4: Dogrula
     CurtainSettings verify;
     if (Settings::load(verify)) {
-        Serial.println("[4] OK - EEPROM dogrulama basarili");
+        Serial.println("[3] OK - EEPROM kaydedildi");
         Settings::print(verify);
     } else {
-        Serial.println("[4] HATA - EEPROM dogrulama basarisiz!");
+        Serial.println("[3] HATA - EEPROM basarisiz!");
         led.setError();
         while(true) { led.update(); }
     }
@@ -132,36 +122,29 @@ void runCalibration() {
 void setup() {
     Serial.begin(BAUD_RATE);
     Serial.println("═════════════════════════════");
-    Serial.println("CurtainModule v0.6");
+    Serial.println("CurtainModule v0.7");
     Serial.println("═════════════════════════════");
 
-    motor.begin();
-    Serial.println("[INIT] Motor OK");
-
+    motor.begin();  Serial.println("[INIT] Motor OK");
     encoder.begin();
     attachInterrupt(digitalPinToInterrupt(PIN_ENCODER), encoderISR, FALLING);
-    Serial.println("[INIT] Encoder OK");
-
-    led.begin();
-    Serial.println("[INIT] LED OK");
-
-    button.begin();
-    Serial.println("[INIT] Buton OK");
+                    Serial.println("[INIT] Encoder OK");
+    led.begin();    Serial.println("[INIT] LED OK");
+    button.begin(); Serial.println("[INIT] Buton OK");
 
     Serial.println("─────────────────────────────");
 
     // EEPROM kontrol
     if (!Settings::load(settings)) {
-        Serial.println("[EEPROM] Kayit yok → Kalibrasyon gerekli!");
-        led.setInit();
+        Serial.println("[EEPROM] Kayit yok!");
+        Serial.println("Kalibrasyon icin 3sn basin...");
+        led.setInit();  // Sari hizli
     } else {
         Serial.println("[EEPROM] Ayarlar yuklendi:");
         Settings::print(settings);
-        led.setIdle();
+        Serial.println("Hazir. | Sifirlamak icin 5sn basin.");
+        led.setIdle();  // Yesil sabit
     }
-
-    Serial.println("Hazir.");
-    Serial.println("Kisa bas → Kalibrasyon");
 }
 
 // ─────────────────────────────────────────
@@ -169,9 +152,21 @@ void loop() {
     button.update();
     led.update();
 
-    if (button.isShortPress()) {
-        runCalibration();
-        Serial.println("Hazir.");
-        Serial.println("Kisa bas → Kalibrasyon");
+    if (settings.isInitialized) {
+        // EEPROM dolu → 5sn basili = Sifirla
+        if (button.isLongPress(5000)) {
+            Serial.println("─────────────────────────────");
+            Serial.println("EEPROM siliniyor...");
+            Settings::reset();
+            settings.isInitialized = false;
+            Serial.println("Silindi! Kalibrasyon icin 3sn basin.");
+            led.setInit();
+        }
+    } else {
+        // EEPROM bos → 3sn basili = Kalibrasyon
+        if (button.isLongPress(3000)) {
+            runCalibration();
+            Serial.println("Hazir. | Sifirlamak icin 5sn basin.");
+        }
     }
 }

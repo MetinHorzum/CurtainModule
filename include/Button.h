@@ -8,22 +8,15 @@ public:
     void begin();
     void update();
 
-    bool isShortPress();
-    bool isLongPress();
-    bool isDoublePress();   // YENİ
+    bool isShortPress();            // < 1sn
+    bool isLongPress(uint16_t ms);  // ms kadar basili tutuldu mu?
 
 private:
     uint8_t  _pin;
     bool     _lastState;
     bool     _shortPress;
-    bool     _longPress;
-    bool     _doublePress;
     uint32_t _pressTime;
-    uint32_t _lastReleaseTime;
     bool     _longFired;
-    uint8_t  _pressCount;
 
-    static const uint16_t SHORT_PRESS_MS  = 50;
-    static const uint16_t LONG_PRESS_MS   = 3000;
-    static const uint16_t DOUBLE_PRESS_MS = 400;
+    static const uint16_t DEBOUNCE_MS = 50;
 };
