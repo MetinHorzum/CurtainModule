@@ -13,16 +13,17 @@ Button  button(PIN_BUTTON);
 
 CurtainSettings settings;
 
-enum State { IDLE, MOVING, STOPPED_MID };  // STOPPED_MID = dönüm noktası arasında durdu
+enum State { IDLE, MOVING, STOPPED_MID };
 State state = IDLE;
 
 #define POS_0    0
 #define POS_90   50
 #define POS_180  100
 
-bool    goingForward = true;
-uint8_t targetPos    = POS_0;
-uint32_t targetPulse = 0;
+bool     goingForward = true;
+uint8_t  targetPos    = POS_0;
+uint32_t targetPulse  = 0;
+uint32_t moveStartTime = 0;   // Timeout için
 
 void encoderISR() { encoder.update(); }
 
@@ -36,24 +37,66 @@ bool isAtWaypoint(uint8_t pos) {
 }
 
 // ─────────────────────────────────────────
+void handleFault() {
+    motor.brake();
+    Serial.println("─────────────────────────────");
+    Serial.println("[!] MOTOR FAULT - Overcurrent/Kisa devre!");
+    Serial.println("[!] Sistem durduruldu.");
+    Serial.println("─────────────────────────────");
+    state = IDLE;
+    led.setError();
+}
+
+// ─────────────────────────────────────────
+void handleTimeout() {
+    motor.brake();
+    Serial.println("─────────────────────────────");
+    Serial.println("[!] HAREKET TIMEOUT!");
+    Serial.print("[!] "); Serial.print(MOVE_TIMEOUT_MS / 1000);
+    Serial.println("sn icinde hedefe ulasilamadi.");
+    Serial.println("[!] Sistem durduruldu.");
+    Serial.println("─────────────────────────────");
+
+    // Anlık pozisyonu tahmin et
+    uint32_t travelled = encoder.getCount();
+    uint32_t currentP  = positionToPulse(settings.currentPosition);
+    uint32_t newPulse  = goingForward
+                       ? currentP + travelled
+                       : (currentP > travelled ? currentP - travelled : 0);
+    uint8_t newPos     = (uint8_t)(newPulse * 100 / settings.totalPulses);
+
+    settings.currentPosition = newPos;
+    Settings::save(settings);
+
+    Serial.print("[!] Son bilinen pozisyon: ~");
+    Serial.print(newPos); Serial.println("%");
+
+    state = STOPPED_MID;
+    led.setError();
+    delay(2000);
+    led.setIdle();
+}
+
+// ─────────────────────────────────────────
 void startMove(uint8_t from, uint8_t target) {
-    targetPos             = target;
-    uint32_t fromPulse    = positionToPulse(from);
-    targetPulse           = positionToPulse(target);
+    targetPos    = target;
+    targetPulse  = positionToPulse(target);
+    moveStartTime = millis();
 
     encoder.resetCount();
 
     Serial.print("[MOT] "); Serial.print(from);
     Serial.print("% → ");   Serial.print(target); Serial.println("%");
+    Serial.print("    PWM: "); Serial.println(PWM_NORMAL);
 
     if (target > from) {
         goingForward = true;
         led.setOpening();
-        motor.forward(60);
+        motor.forward(PWM_NORMAL);
     } else {
         goingForward = false;
         led.setClosing();
-        motor.backward(60);
+        motor.backward(PWM_NORMAL);
     }
 
     state = MOVING;
@@ -63,19 +106,22 @@ void startMove(uint8_t from, uint8_t target) {
 uint8_t nextWaypoint(uint8_t current) {
     if      (current == POS_0)   return POS_90;
     else if (current == POS_90)  return goingForward ? POS_180 : POS_0;
-    else                         return POS_90;  // 180 → 90
+    else                         return POS_90;
 }
 
 // ─────────────────────────────────────────
 void runCalibration() {
-    Serial.println("────────────────────────────���");
+    Serial.println("─────────────────────────────");
     Serial.println("KALIBRASYON BASLADI");
     Serial.println("─────────────────────────────");
+    Serial.print("    PWM: "); Serial.println(PWM_CALIBRATION);
 
+    // ADIM 1: Kapan
     Serial.println("[1] Motor kapaniyor...");
     led.setClosing();
     encoder.resetCount();
-    motor.forward(50);
+    motor.forward(PWM_CALIBRATION);
+
     uint32_t startTime = millis();
     while (true) {
         led.update();
@@ -86,14 +132,12 @@ void runCalibration() {
             Serial.println("ms");
             lp = millis();
         }
-        if (motor.isFault()) {
-            motor.brake(); Serial.println("[!] MOTOR HATA!");
-            led.setError(); while(true) { led.update(); }
-        }
+        if (motor.isFault()) { handleFault(); return; }
         if (encoder.isStalled(STALL_TIMEOUT_MS)) {
             motor.brake();
             settings.closingTime_ms = millis() - startTime;
             Serial.println("[1] OK - Tam kapali");
+            Serial.print("    Sure: "); Serial.print(settings.closingTime_ms); Serial.println("ms");
             break;
         }
     }
@@ -101,9 +145,11 @@ void runCalibration() {
     delay(500);
     encoder.resetCount();
 
+    // ADIM 2: Ac
     Serial.println("[2] Motor aciliyor...");
     led.setOpening();
-    motor.backward(50);
+    motor.backward(PWM_CALIBRATION);
+
     startTime = millis();
     while (true) {
         led.update();
@@ -114,19 +160,18 @@ void runCalibration() {
             Serial.println("ms");
             lp2 = millis();
         }
-        if (motor.isFault()) {
-            motor.brake(); Serial.println("[!] MOTOR HATA!");
-            led.setError(); while(true) { led.update(); }
-        }
+        if (motor.isFault()) { handleFault(); return; }
         if (encoder.isStalled(STALL_TIMEOUT_MS)) {
             motor.brake();
             settings.openingTime_ms = millis() - startTime;
             Serial.println("[2] OK - Tam acik");
+            Serial.print("    Sure: ");        Serial.print(settings.openingTime_ms); Serial.println("ms");
             Serial.print("    Toplam pulse: "); Serial.println(encoder.getCount());
             break;
         }
     }
 
+    // ADIM 3: Kaydet
     settings.totalPulses     = encoder.getCount();
     settings.currentPosition = POS_180;
     settings.isInitialized   = true;
@@ -144,7 +189,7 @@ void runCalibration() {
     Serial.println("KALIBRASYON TAMAMLANDI ✓");
     led.setSaved(); delay(1500); led.setIdle();
 
-    goingForward = false;  // 180'deyiz
+    goingForward = false;
     state = IDLE;
 }
 
@@ -152,7 +197,7 @@ void runCalibration() {
 void setup() {
     Serial.begin(BAUD_RATE);
     Serial.println("═════════════════════════════");
-    Serial.println("CurtainModule v1.0");
+    Serial.println("CurtainModule v1.1");
     Serial.println("═════════════════════════════");
 
     motor.begin();   Serial.println("[INIT] Motor OK");
@@ -184,6 +229,20 @@ void loop() {
 
     if (settings.isInitialized) {
 
+        // ── NFAULT kontrolü (her zaman aktif) ──
+        if (motor.isFault() && state == MOVING) {
+            handleFault();
+            return;
+        }
+
+        // ── Timeout kontrolü ──
+        if (state == MOVING) {
+            if (millis() - moveStartTime >= MOVE_TIMEOUT_MS) {
+                handleTimeout();
+                return;
+            }
+        }
+
         // 5sn → Sifirla
         if (button.isLongPress(5000)) {
             motor.brake();
@@ -198,16 +257,14 @@ void loop() {
         // Kisa bas
         if (button.isShortPress()) {
             if (state == MOVING) {
-                // ── Hareket ediyorken → DUR ──
+                // Dur
                 motor.brake();
-
-                // Anlık pozisyonu hesapla
-                uint32_t travelled   = encoder.getCount();
-                uint32_t currentP    = positionToPulse(settings.currentPosition);
-                uint32_t newPulse    = goingForward
-                                     ? currentP + travelled
-                                     : (currentP > travelled ? currentP - travelled : 0);
-                uint8_t  newPos      = (uint8_t)(newPulse * 100 / settings.totalPulses);
+                uint32_t travelled = encoder.getCount();
+                uint32_t currentP  = positionToPulse(settings.currentPosition);
+                uint32_t newPulse  = goingForward
+                                   ? currentP + travelled
+                                   : (currentP > travelled ? currentP - travelled : 0);
+                uint8_t newPos     = (uint8_t)(newPulse * 100 / settings.totalPulses);
 
                 settings.currentPosition = newPos;
                 Settings::save(settings);
@@ -215,34 +272,22 @@ void loop() {
                 Serial.print("[MOT] DURDURULDU | Pozisyon: ~");
                 Serial.print(newPos); Serial.println("%");
 
-                state = STOPPED_MID;  // Dönüm noktası arasında durdu
+                state = STOPPED_MID;
                 led.setIdle();
 
             } else if (state == STOPPED_MID) {
-                // ── Arada duruyorken → Geri dön ──
-                goingForward = !goingForward;
-                uint8_t backTarget = goingForward ? POS_90 : POS_90;
-
-                // Hangi dönüm noktasına dönecek?
-                backTarget = goingForward
-                           ? POS_90   // 0→90 arasındayken geri = 0'a dön
-                           : POS_90;  // 90→180 arasındayken geri = 90'a dön
-
-                // Tam olarak: ters yöndeki en yakın waypoint
-                backTarget = goingForward ? POS_0 : POS_180;
-                // Ama nerede durduğumuza göre:
-                uint8_t cur = settings.currentPosition;
-                if (cur < POS_90) {
-                    backTarget = goingForward ? POS_90 : POS_0;
-                } else {
-                    backTarget = goingForward ? POS_180 : POS_90;
-                }
+                // Ters yöne dön
+                goingForward      = !goingForward;
+                uint8_t cur       = settings.currentPosition;
+                uint8_t backTarget = (cur < POS_90)
+                                   ? (goingForward ? POS_90 : POS_0)
+                                   : (goingForward ? POS_180 : POS_90);
 
                 Serial.println("[MOT] Ters yone donuluyor...");
                 startMove(settings.currentPosition, backTarget);
 
             } else {
-                // ── IDLE (dönüm noktasında) → Normal senaryo ──
+                // IDLE → normal senaryo
                 uint8_t target = nextWaypoint(settings.currentPosition);
                 startMove(settings.currentPosition, target);
             }
@@ -264,10 +309,8 @@ void loop() {
                 Serial.print("[MOT] Hedefe ulasildi: ");
                 Serial.print(targetPos); Serial.println("%");
 
-                // Dönüm noktasına varıldı → IDLE
                 if      (targetPos == POS_0)   goingForward = true;
                 else if (targetPos == POS_180)  goingForward = false;
-                // POS_90'a varınca yön değişmez, geldiği yönü korur
 
                 state = IDLE;
                 led.setIdle();

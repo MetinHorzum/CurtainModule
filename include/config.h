@@ -30,10 +30,11 @@
 
 // ─── Encoder ──────────────────────────────────────────
 #define STALL_TIMEOUT_MS    300
+#define MOVE_TIMEOUT_MS     8000   // Normal hareket max süresi
 
 // ─── Motor PWM ────────────────────────────────────────
-#define MOTOR_PWM_INIT      50   // Init sirasinda dusuk guc
-#define MOTOR_PWM_NORMAL    180  // Normal kullanim
+#define PWM_CALIBRATION  50     // Kalibrasyon: yavaş, stall tespiti
+#define PWM_NORMAL       100    // Normal mod: hızlı ama güvenli
 
 // ─── Perde Modlari ────────────────────────────────────
 #define MODE_NORMAL     0  // 0% kapali, 100% acik
